@@ -12,11 +12,14 @@ func SetupUsersRoutes(router *gin.RouterGroup) {
 	{
 		// Add the authentication middleware to all routes except login
 
-		userRoutes.Use(middlewares.AuthMiddleware()).GET("/", controllers.GetAllUsers)
+		//userRoutes.Use(middlewares.AuthMiddleware()).GET("/", controllers.GetAllUsers)
+		userRoutes.GET("/", controllers.GetAllUsers)
+		userRoutes.POST("/login", controllers.Login)
+		userRoutes.POST("/user", controllers.CreateUser)
+
 		userRoutes.Use(middlewares.AuthMiddleware()).GET("/:id", controllers.GetUserById)
 		userRoutes.Use(middlewares.AuthMiddleware()).PUT("/:id", controllers.UpdateUser)
 		userRoutes.Use(middlewares.AuthMiddleware()).DELETE("/:id", controllers.DeleteUser)
-		userRoutes.POST("/login", controllers.Login)
-		userRoutes.POST("/", controllers.CreateUser)
+
 	}
 }

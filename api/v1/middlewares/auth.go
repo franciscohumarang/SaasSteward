@@ -26,17 +26,11 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		claims, err := config.VerifyToken(parts[1])
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("Invalid token: %v", err)})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("Invalid tokenerer: %v", err)})
 			return
 		}
 
-		userId, ok := claims["user_id"].(string)
-		if !ok {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-			return
-		}
-
-		c.Set("user_id", userId)
+		c.Set("user_id", claims.UserId)
 		c.Next()
 	}
 }

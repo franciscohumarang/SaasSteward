@@ -4,17 +4,18 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"time"
 
-	"saasmanagement/api/v1/validators"
-	"saasmanagement/config"
-	"saasmanagement/models"
-	"saasmanagement/utils"
-
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
+	"saasmanagement/api/v1/validators"
+	"saasmanagement/config"
+	"saasmanagement/models"
+	"saasmanagement/utils"
 )
 
 func CreateUser(c *gin.Context) {
@@ -178,10 +179,7 @@ func DeleteUser(c *gin.Context) {
 }
 
 func Login(c *gin.Context) {
-	var loginData struct {
-		Email    string `json:"email" validate:"required,email"`
-		Password string `json:"password" validate:"required"`
-	}
+	var loginData models.Login
 
 	if err := c.ShouldBindJSON(&loginData); err != nil {
 		utils.Error(c, http.StatusBadRequest, "Invalid request payload")
@@ -189,7 +187,7 @@ func Login(c *gin.Context) {
 	}
 
 	// Validate the input data
-	if err := validators.ValidateUser(&models.User{Email: loginData.Email, Password: loginData.Password}); err != nil {
+	if err := validators.ValidateLogin(&loginData); err != nil {
 		utils.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -214,11 +212,96 @@ func Login(c *gin.Context) {
 	}
 
 	// Generate a JWT token
-	token, err := config.GenerateToken(user.ID.Hex())
+	/*token, err := config.GenerateToken(user.ID.Hex())
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, "Failed to generate token")
 		return
 	}
+	*/
+	// if authentication succeeds, generate an access token and a refresh token
+	accessClaims := models.Claims{
+		UserId:       user.ID.Hex(),
+		AccessToken:  true,
+		RefreshToken: false,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(time.Minute * 30).Unix(),
+			Issuer:    "saasteward",
+		},
+	}
+	var jwtSecret = []byte(config.GetEnv("JWT_SECRET"))
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
+	signedAccessToken, err := accessToken.SignedString(jwtSecret)
 
-	utils.Success(c, gin.H{"token": token})
+	if err != nil {
+
+		utils.Error(c, http.StatusInternalServerError, "Failed to generate signed access token")
+		return
+	}
+
+	refreshClaims := models.Claims{
+		UserId:       user.ID.Hex(),
+		AccessToken:  false,
+		RefreshToken: true,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(time.Hour * 24 * 7).Unix(),
+			Issuer:    "saasteward",
+		},
+	}
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
+	signedRefreshToken, err := refreshToken.SignedString(jwtSecret)
+	if err != nil {
+		utils.Error(c, http.StatusInternalServerError, "Failed to generate signed refresh token")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"accessToken":  signedAccessToken,
+		"refreshToken": signedRefreshToken,
+	})
+
+}
+
+// RefreshHandler generates a new access token using a valid refresh token
+func RefreshToken(c *gin.Context) {
+	refreshToken, err := c.Cookie("refreshToken")
+	var jwtSecret = []byte(config.GetEnv("JWT_SECRET"))
+	if err != nil {
+
+		utils.Error(c, http.StatusBadRequest, "Refresh token missing")
+		return
+	}
+
+	token, err := jwt.ParseWithClaims(refreshToken, &models.Claims{}, func(token *jwt.Token) (interface{}, error) {
+		return jwtSecret, nil
+	})
+	if err != nil {
+
+		utils.Error(c, http.StatusUnauthorized, "Invalid refresh token")
+		return
+	}
+
+	claims, ok := token.Claims.(*models.Claims)
+	if !ok || !claims.RefreshToken || claims.ExpiresAt < time.Now().Unix() {
+		utils.Error(c, http.StatusUnauthorized, "Invalid refresh token")
+		return
+	}
+
+	accessClaims := models.Claims{
+		UserId:       claims.UserId,
+		AccessToken:  true,
+		RefreshToken: false,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(time.Minute * 30).Unix(),
+			Issuer:    "your-app-name",
+		},
+	}
+
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
+	signedAccessToken, err := accessToken.SignedString(jwtSecret)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"accessToken": signedAccessToken})
 }

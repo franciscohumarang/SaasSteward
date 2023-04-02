@@ -15,7 +15,7 @@ func InitDB() {
 
 	uri := GetEnv("DB_URI")
 	dbName := GetEnv("DB_NAME")
-	fmt.Println("DB URI", uri)
+
 	clientOptions := options.Client().ApplyURI(uri)
 
 	// Connect to MongoDB

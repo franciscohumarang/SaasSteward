@@ -16,6 +16,7 @@ func SetupUsersRoutes(router *gin.RouterGroup) {
 		userRoutes.GET("/", controllers.GetAllUsers)
 		userRoutes.POST("/login", controllers.Login)
 		userRoutes.POST("/user", controllers.CreateUser)
+		userRoutes.GET("/refresh", controllers.RefreshToken)
 
 		userRoutes.Use(middlewares.AuthMiddleware()).GET("/:id", controllers.GetUserById)
 		userRoutes.Use(middlewares.AuthMiddleware()).PUT("/:id", controllers.UpdateUser)

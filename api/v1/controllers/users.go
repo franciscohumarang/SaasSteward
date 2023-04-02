@@ -2,20 +2,20 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
-	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"saasmanagement/api/v1/validators"
+	"saasmanagement/config"
+	"saasmanagement/models"
+	"saasmanagement/utils"
+
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
-	"saasmanagement/api/v1/validators"
-	"saasmanagement/config"
-	"saasmanagement/models"
-	"saasmanagement/utils"
 )
 
 func CreateUser(c *gin.Context) {
@@ -212,48 +212,18 @@ func Login(c *gin.Context) {
 	}
 
 	// Generate a JWT token
-	/*token, err := config.GenerateToken(user.ID.Hex())
+	signedAccessToken, err := config.GenerateAccessToken(user.ID.Hex())
 	if err != nil {
-		utils.Error(c, http.StatusInternalServerError, "Failed to generate token")
-		return
-	}
-	*/
-	// if authentication succeeds, generate an access token and a refresh token
-	accessClaims := models.Claims{
-		UserId:       user.ID.Hex(),
-		AccessToken:  true,
-		RefreshToken: false,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(time.Minute * 30).Unix(),
-			Issuer:    "saasteward",
-		},
-	}
-	var jwtSecret = []byte(config.GetEnv("JWT_SECRET"))
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
-	signedAccessToken, err := accessToken.SignedString(jwtSecret)
-
-	if err != nil {
-
-		utils.Error(c, http.StatusInternalServerError, "Failed to generate signed access token")
+		utils.Error(c, http.StatusInternalServerError, "Failed to generate access token")
 		return
 	}
 
-	refreshClaims := models.Claims{
-		UserId:       user.ID.Hex(),
-		AccessToken:  false,
-		RefreshToken: true,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(time.Hour * 24 * 7).Unix(),
-			Issuer:    "saasteward",
-		},
-	}
-	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
-	signedRefreshToken, err := refreshToken.SignedString(jwtSecret)
+	// Generate a JWT refresh token
+	signedRefreshToken, err := config.GenerateRefreshToken(user.ID.Hex())
 	if err != nil {
-		utils.Error(c, http.StatusInternalServerError, "Failed to generate signed refresh token")
+		utils.Error(c, http.StatusInternalServerError, "Failed to generate refresh token")
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"accessToken":  signedAccessToken,
 		"refreshToken": signedRefreshToken,
@@ -263,43 +233,28 @@ func Login(c *gin.Context) {
 
 // RefreshHandler generates a new access token using a valid refresh token
 func RefreshToken(c *gin.Context) {
-	refreshToken, err := c.Cookie("refreshToken")
-	var jwtSecret = []byte(config.GetEnv("JWT_SECRET"))
+	refreshToken, err := c.Cookie("refresh_token")
 	if err != nil {
 
 		utils.Error(c, http.StatusBadRequest, "Refresh token missing")
 		return
 	}
 
-	token, err := jwt.ParseWithClaims(refreshToken, &models.Claims{}, func(token *jwt.Token) (interface{}, error) {
-		return jwtSecret, nil
-	})
+	claims, err := config.VerifyRefreshToken(refreshToken)
 	if err != nil {
-
-		utils.Error(c, http.StatusUnauthorized, "Invalid refresh token")
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("%v", err)})
 		return
 	}
 
-	claims, ok := token.Claims.(*models.Claims)
-	if !ok || !claims.RefreshToken || claims.ExpiresAt < time.Now().Unix() {
-		utils.Error(c, http.StatusUnauthorized, "Invalid refresh token")
+	userId, ok := claims["user_id"].(string)
+	if !ok {
+		utils.Error(c, http.StatusUnauthorized, "Unable to generate new token. Invalid user")
 		return
 	}
 
-	accessClaims := models.Claims{
-		UserId:       claims.UserId,
-		AccessToken:  true,
-		RefreshToken: false,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(time.Minute * 30).Unix(),
-			Issuer:    "your-app-name",
-		},
-	}
-
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
-	signedAccessToken, err := accessToken.SignedString(jwtSecret)
+	signedAccessToken, err := config.GenerateRefreshToken(userId)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		utils.Error(c, http.StatusUnauthorized, "Unable to generate new token")
 		return
 	}
 

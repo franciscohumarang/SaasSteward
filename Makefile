@@ -7,7 +7,7 @@ APP_NAME = my-app-name
 LOCATION = eastus
 IMAGE_NAME = my-image-name
 DOCKERFILE_PATH = .
-CONTAINER_PORT = 8080
+CONTAINER_PORT = 8082
 
 # Build and push the Docker image
 docker-build:

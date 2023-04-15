@@ -24,3 +24,15 @@ func SetupUsersRoutes(router *gin.RouterGroup) {
 
 	}
 }
+
+func SetupCustomEndpointRoutes(router *gin.RouterGroup) {
+	customRoutes := router.Group("/services")
+	{
+
+		customRoutes.Use(middlewares.AuthMiddleware()).GET("/external-endpoint", func(c *gin.Context) {
+			url := "http://localhost:8082/api/v1/users"
+			controllers.ExternalEndpoint(c, url)
+		})
+
+	}
+}

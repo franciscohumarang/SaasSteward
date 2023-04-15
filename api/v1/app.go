@@ -18,6 +18,7 @@ func Start() {
 	apiV1Routes := router.Group("/api/v1")
 	{
 		routes.SetupUsersRoutes(apiV1Routes)
+		routes.SetupCustomEndpointRoutes(apiV1Routes)
 	}
 
 	// Start the server

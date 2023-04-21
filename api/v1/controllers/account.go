@@ -87,9 +87,11 @@ func DeleteAccount(c *gin.Context) {
 	utils.Success(c, "Account deleted")
 }
 
-func GetAllAccounts(c *gin.Context) {
+func GetAllAccountsByUserID(c *gin.Context) {
+	objectID := c.Param("user_id")
 	var accounts []models.Account
-	cursor, err := config.GetDBCollection("accounts").Find(context.Background(), bson.M{})
+	filter := bson.M{"user_id": objectID}
+	cursor, err := config.GetDBCollection("accounts").Find(context.Background(), filter)
 	if err != nil {
 		utils.Error(c, http.StatusInternalServerError, "Failed to get accounts")
 		return

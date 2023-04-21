@@ -10,7 +10,8 @@ type User struct {
 	LastName     string             `bson:"last_name,omitempty" json:"last_name,omitempty" validate:"required"`
 	Email        string             `bson:"email,omitempty" json:"email,omitempty" validate:"required,email"`
 	Company      string             `bson:"company,omitempty" json:"company,omitempty"`
-	CountryCode  string             `bson:"country_code,omitempty" json:"country_code,omitempty" validate:"required"`
+	CountryCode  string             `bson:"country_code,omitempty" json:"country_code,omitempty"`
 	Password     string             `bson:"password,omitempty" json:"password,omitempty" validate:"required,min=8"`
 	MobileNumber string             `bson:"mobile_number,omitempty" json:"mobile_number,omitempty" validate:"required"`
+	Role         string             `bson:"role,omitempty" json:"role,omitempty" validate:"required"`
 }

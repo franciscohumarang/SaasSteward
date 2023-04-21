@@ -19,3 +19,11 @@ func ValidateLogin(loginData *models.Login) error {
 func ValidateAccount(account *models.Account) error {
 	return validate.Struct(account)
 }
+
+func ValidateBilling(billing *models.Billing) error {
+	return validate.Struct(billing)
+}
+
+func ValidateCompany(company *models.Company) error {
+	return validate.Struct(company)
+}
